@@ -1,0 +1,110 @@
+---
+title: "Project 1"
+author: "Tanja Venborg"
+date: "4 August 2016"
+output: html_document
+---
+
+# Loading the data
+
+First the activity data will be loaded
+
+```{r load data, echo = TRUE}
+data <- read.csv("/Users/Thansen/Desktop/R/ReproducibleResearch/activity.csv")
+data <- na.omit(data)
+```
+
+
+# Processing data
+
+Here I find the sum of the steps taken each day. I start by looking at the data. Then I create a new datatable, where the steps are summed up by date, then I add the columnnames. Finally I print the new steps table, where its now clear how many steps where taken each of the dates where ther is a step. 
+
+```{r}
+head(data)
+library(data.table)
+stepstabel <-  as.data.table(data)[, by = . (date), sum(steps)]
+colnames(stepstabel) <- c("Date","steps")
+stepstabel$Date <- format(as.Date(stepstabel$Date), "%Y/%m/%d")
+print(stepstabel)
+```
+
+# Creating a histogram
+
+```{r, echo = TRUE}
+steps1 <- hist(stepstabel$steps, breaks =20, main = "Total steps per day", xlab ="Steps", ylab =  "Frequency", col ="green")
+```
+
+# Plotting the daily activity pattern
+
+To create the plot, i first stort the data in a sum of step by the intervals. To get the line plot, I type = "l". If this isn't specified, the plot will be a scatterplot.
+```{r}
+interval <- as.data.table(data)[,sum(steps), by = .(interval)] 
+colnames(interval) <- c("interval", "steps")
+plot(interval, type = "l")
+```
+
+Finding the interval with the maximum numbers of steps is pretty straight forward.
+``` {r}
+maxstep <- sapply (interval, max)
+interval[steps %in% maxstep,]
+                            
+```
+
+This means that interval 835 has the largest amount of steps.
+
+# Imputing missing values
+
+Since I removed the NA's from the first dataset, I reload it and in a new data name. 
+Calculating the total amount of missing values from the original dataset
+```{r}
+orgdata <- read.csv("/Users/Thansen/Desktop/R/ReproducibleResearch/activity.csv")
+sum(is.na(orgdata))
+nrow(orgdata)
+sum(is.na(orgdata))/nrow(orgdata)
+```
+
+There was 2304 missing values. That seems like quite a lot, actually it is 13%.  
+
+To fill in the missing values, I take the mean of the filled-in days.
+
+```{r}
+orgdata$steps[is.na(orgdata$steps)] <-  mean(data$steps, na.rm = FALSE)
+head(orgdata)
+sum(is.na(orgdata))
+```
+
+There is no longer any missing values in the data.
+
+```{r}
+filled_in_data <-  as.data.table(orgdata)[, by = . (date), sum(steps)]
+colnames(filled_in_data) <- c("interval", "steps")
+steps2 <- hist(filled_in_data$steps, breaks = 20, xlab = "Steps", main = "The total amount of steps with filled in data", col ="red")
+```
+
+Combining the two histograms to see the difference
+
+```{r}
+set.seed(42)
+plot(steps1, col = rgb(0,0,1, 1/4), xlim = c(0,24000))
+plot(steps2, col = rgb(1,0,0,1/4), xlim = c(0,24000), add=T)
+```
+
+# Weekdays vs weekends
+First I'm adding and extra row where the weekend, weekday distinguishion is made.
+
+```{r}
+orgdata$realdate <-  as.Date(orgdata$date, format = "%Y-%m-%d")
+orgdata$weekday <- weekdays(orgdata$realdate)
+
+orgdata$daytype <- ifelse(orgdata$weekday == "Saturday" | orgdata$weekday == "Sunday", "weekend", "weekday")
+head(orgdata, n = 10) 
+```
+
+Plotting the weekdays vs. weekends
+
+```{r}
+sumdata_interval <- aggregate(steps~interval+daytype,data = orgdata, FUN = mean, na.action = na.omit)
+head(sumdata_interval)
+library(lattice)
+xyplot(steps ~interval | daytype, data= sumdata_interval, layout =c(1,2), type = "l")
+```
